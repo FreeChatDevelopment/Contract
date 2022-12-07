@@ -1,95 +1,144 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.4.24;
+import "@openzeppelin/contracts/utils/Strings.sol";
 
-// 彩票项目
+pragma solidity >=0.7.0 <0.9.0;
 
 contract Lottery {
-    // 1. 管理员： 负责开奖和退钱
-    // 2. 彩民池，address[] player
-    // 3. 当前期数， round ,每期结束加一
+    uint256 public constant ticketPrice = 0.01 ether;
+    uint256 public constant maxTickets = 100; // maximum tickets per lottery
+    uint256 public constant ticketCommission = 0.001 ether; // commition per ticket
+    uint256 public constant duration = 30 minutes; // The duration set for the lottery
 
-    address public manager;
-    address[] public players;
-    uint256 public round;
-    address public winner;
+    uint256 public expiration; // Timeout in case That the lottery was not carried out.
+    address public lotteryOperator; // the crator of the lottery
+    uint256 public operatorTotalCommission = 0; // the total commission balance
+    address public lastWinner; // the last winner of the lottery
+    uint256 public lastWinnerAmount; // the last winner amount of the lottery
 
-    // 管理员
-    constructor() public {
-        manager = msg.sender;
-    }
+    mapping(address => uint256) public winnings; // maps the winners to there winnings
+    address[] public tickets; //array of purchased Tickets
 
-    // 投注函数：1. 每个人可以投多次，但是每次只能投注 1 ether
-    function play() payable public {
-        require(msg.value == 1 ether);
-        //  把参与者加入到彩票池中
-        players.push(msg.sender);
-    }
-
-    modifier onlyManager {
-        require(msg.sender == manager);
+    // modifier to check if caller is the lottery operator
+    modifier isOperator() {
+        require(
+            (msg.sender == lotteryOperator),
+            "Caller is not the lottery operator"
+        );
         _;
     }
 
-    // 开奖函数：从彩民池（数组）中找到一个随机彩民（找随机数）
-    // 找到一个特别大的数（随机），对我们的彩民数组长度求余数
-    // 用哈希数值来实现大的随机数
-    // 哈希内容的随机：当前时间，区块的挖矿难度，彩民数量，作为输入
-
-    // 找随机数
-    function kaijiang() onlyManager public {
-        bytes memory v1 = abi.encodePacked(block.timestamp, block.difficulty, players.length);
-        bytes32 v2 = keccak256(v1);
-        uint256 v3 = uint256(v2);
-
-        // 求余
-        uint256 index = v3 % players.length;
-        winner = players[index];
-
-        // require(msg.sender == manager); // 限定管理员
-
-        uint256 money = address(this).balance * 90 / 100;
-        uint256 money1 = address(this).balance - money;
-
-        winner.transfer(money);
-        manager.transfer(money1);
-        //期数加一
-        round++;
-        //一轮之后清理彩民池
-        delete players;  
-
+    // modifier to check if caller is a winner
+    modifier isWinner() {
+        require(IsWinner(), "Caller is not a winner");
+        _;
     }
 
-    // 退奖逻辑
-    // 1. 遍历players数组，逐一退款1 ether
-    // 2. 期数加一
-    // 3. 彩民池清零
-    // 调用者的花费手续费（管理者）
+    constructor() {
+        lotteryOperator = msg.sender;
+        expiration = block.timestamp + duration;
+    }
 
-    function tuijiang() onlyManager public {
-        for(uint256 i = 0; i < players.length; i++){
-            players[i].transfer(1 ether);
+    // return all the tickets
+    function getTickets() public view returns (address[] memory) {
+        return tickets;
+    }
+
+    function getWinningsForAddress(address addr) public view returns (uint256) {
+        return winnings[addr];
+    }
+
+    function BuyTickets() public payable {
+        require(
+            msg.value % ticketPrice == 0,
+            string.concat(
+                "the value must be multiple of ",
+                Strings.toString(ticketPrice),
+                " Ether"
+            )
+        );
+        uint256 numOfTicketsToBuy = msg.value / ticketPrice;
+
+        require(
+            numOfTicketsToBuy <= RemainingTickets(),
+            "Not enough tickets available."
+        );
+
+        for (uint256 i = 0; i < numOfTicketsToBuy; i++) {
+            tickets.push(msg.sender);
         }
-
-        round++;
-        delete players;
     }
 
-    // 获取彩民数
-    function getPlayersCount() public view returns(uint256) {
-        return players.length;
+    function DrawWinnerTicket() public isOperator {
+        require(tickets.length > 0, "No tickets were purchased");
+
+        bytes32 blockHash = blockhash(block.number - tickets.length);
+        uint256 randomNumber = uint256(
+            keccak256(abi.encodePacked(block.timestamp, blockHash))
+        );
+        uint256 winningTicket = randomNumber % tickets.length;
+
+        address winner = tickets[winningTicket];
+        lastWinner = winner;
+        winnings[winner] += (tickets.length * (ticketPrice - ticketCommission));
+        lastWinnerAmount = winnings[winner];
+        operatorTotalCommission += (tickets.length * ticketCommission);
+        delete tickets;
+        expiration = block.timestamp + duration;
     }
 
+    function restartDraw() public isOperator {
+        require(tickets.length == 0, "Cannot Restart Draw as Draw is in play");
 
-    // 返回余额
-    function getBalance() public view returns(uint256) {
-        return address(this).balance;
+        delete tickets;
+        expiration = block.timestamp + duration;
     }
 
-    // 返回彩民地址
-    function getplayers() public view returns(address[]) {
-        return players;
+    function checkWinningsAmount() public view returns (uint256) {
+        address payable winner = payable(msg.sender);
+
+        uint256 reward2Transfer = winnings[winner];
+
+        return reward2Transfer;
     }
 
+    function WithdrawWinnings() public isWinner {
+        address payable winner = payable(msg.sender);
 
+        uint256 reward2Transfer = winnings[winner];
+        winnings[winner] = 0;
 
+        winner.transfer(reward2Transfer);
+    }
+
+    function RefundAll() public {
+        require(block.timestamp >= expiration, "the lottery not expired yet");
+
+        for (uint256 i = 0; i < tickets.length; i++) {
+            address payable to = payable(tickets[i]);
+            tickets[i] = address(0);
+            to.transfer(ticketPrice);
+        }
+        delete tickets;
+    }
+
+    function WithdrawCommission() public isOperator {
+        address payable operator = payable(msg.sender);
+
+        uint256 commission2Transfer = operatorTotalCommission;
+        operatorTotalCommission = 0;
+
+        operator.transfer(commission2Transfer);
+    }
+
+    function IsWinner() public view returns (bool) {
+        return winnings[msg.sender] > 0;
+    }
+
+    function CurrentWinningReward() public view returns (uint256) {
+        return tickets.length * ticketPrice;
+    }
+
+    function RemainingTickets() public view returns (uint256) {
+        return maxTickets - tickets.length;
+    }
 }
