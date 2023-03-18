@@ -1,90 +1,118 @@
-## 这是一个名为 "Freechat vFCC中心化积分系统" 的智能合约，其功能如下：
+这份智能合约是一个中心化积分系统，名为 Freechat vFCC。它允许用户在合约中存入一定数量的 ERC20 代币，并允许管理员在合约中转移代币到指定地址。
 
-只有被授予 "ADMIN_ROLE" 的角色才能进行 "adminTransfer" 操作，该操作允许管理员向指定地址转移代币。
+以下是合约中的函数和调用参数的详细介绍：
 
-"deposit" 函数允许用户将代币存入合约中，存入的代币数量不能为 0。
+deposit(uint256 amount)
+功能：允许用户在合约中存入指定数量的 ERC20 代币
+参数：amount - 存款金额
 
-"withdraw" 函数允许管理员从合约中提取代币，提取的代币数量不能超过合约中存储的余额。
+adminTransfer(address to, uint256 amount)
+功能：允许管理员从合约中转移指定数量的 ERC20 代币到指定地址
+参数：to - 接收地址，amount - 转账金额
 
-"emergencyWithdraw" 函数允许管理员从合约中提取所有的代币。
+getDepositAmount(address user, uint256 nonce)
+功能：根据用户地址和Nonce值获取存款金额
+参数：user - 用户地址，nonce - 存款Nonce值
 
-"getDepositAmount" 函数允许用户获取指定 nonce 的存款金额。
+getDepositNonce(address user)
+功能：获取用户的存款Nonce值
+参数：user - 用户地址
 
-"getDepositNonce" 函数允许用户获取他们存入合约的存款记录数。
+getAdminTransferAmount(address admin, uint256 nonce)
+功能：根据管理员地址和Nonce值获取管理员转账金额
+参数：admin - 管理员地址，nonce - 转账Nonce值
 
-"getAdminTransferAmount" 函数允许管理员获取指定 nonce 的转账金额。
+getAdminTransferNonce(address admin)
+功能：获取管理员的转账Nonce值
+参数：admin - 管理员地址
 
-"getAdminTransferNonce" 函数允许管理员获取他们进行的转账记录数。
+getRecipient(address admin, uint256 nonce)
+功能：根据管理员地址和Nonce值获取接收者地址
+参数：admin - 管理员地址，nonce - 转账Nonce值
 
-"getRecipient" 函数允许管理员获取指定 nonce 的转账接收地址。
+getBalance()
+功能：获取合约中的 ERC20 代币余额
+参数：无
 
-"getBalance" 函数允许管理员获取合约中存储的代币余额。
+getAllowance()
+功能：获取合约被授权的代币数量
+参数：无
 
-"getAllowance" 函数允许管理员获取合约被授权的代币数量。
+withdraw(uint256 amount)
+功能：仅限管理员角色调用，从合约中提取指定数量的 ERC20 代币到管理员地址
+参数：amount - 提取金额
 
-"revokeAdminRole" 和 "grantAdminRole" 函数允许管理员对其他帐户授予或撤销 "ADMIN_ROLE" 角色。
+revokeAdminRole(address account)
+功能：仅限默认管理员角色调用，撤销指定账户的管理员角色
+参数：account - 要撤销角色的账户地址
 
-"renounceAdminRole" 函数允许管理员自己放弃 "ADMIN_ROLE" 角色。
+grantAdminRole(address account)
+功能：仅限默认管理员角色调用，授予指定账户管理员角色
+参数：account - 要授予角色的账户地址
 
-该合约使用了 OpenZeppelin 的 AccessControl 和 ReentrancyGuard 库以增加安全性。
+renounceAdminRole()
+功能：放弃管理员角色
+参数：无
 
+管理员转账
+函数名：adminTransfer
 
-## vFCC代码参数的描述
+调用参数：address to, uint256 amount
 
-### 引用的 Solidity 库和协议
+功能描述：管理员向指定地址转移代币，需要具有ADMIN_ROLE权限。
 
-@openzeppelin/contracts/token/ERC20/IERC20.sol：用于 ERC20 token 的接口定义
+获取存款记录
+函数名：getDepositAmount, getDepositNonce
 
-@openzeppelin/contracts/access/AccessControl.sol：用于管理合约角色和权限的合约
+调用参数：address user, uint256 nonce
 
-@openzeppelin/contracts/utils/math/SafeMath.sol：用于执行安全数学运算的库
+功能描述：根据用户地址和Nonce值获取存款金额及Nonce值。
 
-@openzeppelin/contracts/security/ReentrancyGuard.sol：用于防止重入攻击的合约
+获取管理员转账记录
+函数名：getAdminTransferAmount, getAdminTransferNonce, getRecipient
 
-### 合约中的主要数据结构和变量
+调用参数：address admin, uint256 nonce
 
-IERC20 private _freechatCoin：用于管理 ERC20 token 的实例
+功能描述：根据管理员地址和Nonce值获取管理员转账金额、Nonce值及接收者地址。
 
-bytes32 public constant ADMIN_ROLE：用于定义管理员角色的常量
+获取代币余额和授权额度
+函数名：getBalance, getAllowance
 
-struct Record：用于存储存款和管理员转账记录的结构体
+调用参数：无
 
-mapping(address => Record[]) private _records：用于存储用户的存款和管理员转账记录的映射
+功能描述：分别获取合约中的代币余额和调用者对合约的代币授权额度。
 
-uint256 private constant RECORDS_LIMIT：用于限制存储记录数量的常量
+提现代币
+函数名：withdraw
 
-### 合约中的主要事件
+调用参数：uint256 amount
 
-event Deposit：用于记录用户存款的事件
+功能描述：仅限管理员角色调用，从合约中提现指定数量的代币到调用者地址。
 
-event AdminTransfer：用于记录管理员转账的事件
+撤销和授予管理员角色
+函数名：revokeAdminRole, grantAdminRole
 
-### 合约中的主要函数
+调用参数：address account
 
-deposit：用户存款函数，用于将用户的 ERC20 token 存入合约中，并记录存款记录
+功能描述：仅限默认管理员角色调用，分别撤销和授予指定地址的管理员角色。
 
-adminTransfer：管理员转账函数，用于将 ERC20 token 从合约中转账给指定地址，并记录管理员转账记录
+放弃管理员角色
+函数名：renounceAdminRole
 
-getDepositAmount：获取用户指定存款记录的存款金额
+调用参数：无
 
-getDepositNonce：获取用户存款记录数量
+功能描述：调用者放弃自己的管理员角色。
 
-getAdminTransferAmount：获取指定管理员转账记录的转账金额
+getRecipient(address admin, uint256 nonce) public view onlyRole(DEFAULT_ADMIN_ROLE) returns (address)：根据管理员地址和Nonce值获取对应管理员转账记录的接收者地址。参数为管理员地址和对应的Nonce值。该函数返回对应管理员转账记录的接收者地址。
 
-getAdminTransferNonce：获取管理员转账记录数量
+getBalance() external view onlyRole(DEFAULT_ADMIN_ROLE) returns (uint256)：获取合约中的代币余额。该函数仅限管理员角色调用。该函数返回合约中的代币余额。
 
-getRecipient：获取指定管理员转账记录的接收地址
+getAllowance() external view onlyRole(DEFAULT_ADMIN_ROLE) returns (uint256)：获取合约的授权额度。该函数仅限管理员角色调用。该函数返回合约的授权额度。
 
-getBalance：获取合约当前的 ERC20 token 余额
+withdraw(uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant：提现函数，仅限管理员角色调用。参数为提现的代币数量。该函数检查合约中的代币余额是否足够，如果足够则调用ERC20代币合约的方法，将代币从合约地址转移到调用者地址。
 
-getAllowance：获取合约当前授权可转账的 ERC20 token 数量
+revokeAdminRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE)：撤销管理员角色。参数为要撤销的管理员地址。该函数仅限管理员角色调用。该函数将指定地址的管理员角色撤销。
 
-withdraw：管理员提现函数，用于将合约中的 ERC20 token 转账给合约所有者
+grantAdminRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE)：授予管理员角色。参数为要授予管理员角色的地址。该函数仅限管理员角色调用。该函数将指定地址授予管理员角色。
 
-emergencyWithdraw：管理员紧急提现函数，用于将合约中的所有 ERC20 token 转账给合约所有者
-
-revokeAdminRole：取消管理员角色的函数，用于从指定账户中撤销管理员角色
-
-grantAdminRole：授予管理员角色的函数，用于将管理员角色授予指定账户
-
-renounceAdminRole：放弃管理员角色的函数，用于从当前调用者中移除管理员角色
+renounceAdminRole() external：放弃管理员角色。该函数将当前调用者的管理员角色放弃。
