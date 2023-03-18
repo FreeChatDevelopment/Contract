@@ -12,17 +12,10 @@ FreechatDAO智能合约库，公开代码以及接受安全审计。
 
 FreechatDAO的社区治理代币智能合约，可以应用于Freechat App的应用。
 
-### Lottery contract
+### vFCC Centralized Processing Contracts
 
-Freechat乐透游戏的智能合约。
+FreechatDAO的vFCC代币处理的智能合约。
 
-### Airdrop contract
-
-Freechat的ERC20、ERC721、ERC1155的空投合约。
-
-### NFT市场合约
-
-.......
 
 ## 相关资料
 
