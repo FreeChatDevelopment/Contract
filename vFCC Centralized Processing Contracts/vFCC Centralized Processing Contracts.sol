@@ -51,9 +51,10 @@ contract MyContract {
         require(amount > 0, "Transfer amount must be greater than 0"); // 检查转账数量是否大于0
         require(nonce == records[address(this)].transferNonce + 1, "Invalid nonce"); // 检查nonce是否连续
         require(freechatCoin.allowance(address(this), admin) >= amount, "Contract does not have sufficient allowance"); // 检查合约是否有足够的授权
+        require(to != address(0), "Invalid recipient address"); // 检查收款地址是否合法
 
         // 执行代币转账
-        freechatCoin.transferFrom(address(this), to, amount);
+        require(freechatCoin.transfer(to, amount), "Failed to transfer Freechat Coins");
 
         // 更新转账记录
         Record storage record = records[address(this)];
