@@ -1,15 +1,81 @@
-这个智能合约是一个代币质押合约，用于实现用户将代币质押到合约中以获取奖励。以下是合约实现的主要功能：
+合约名：TokenStaking
 
-质押代币：用户可以将其代币质押到合约中。质押的代币数量将被记录在用户的余额中。
+功能介绍：
 
-计算奖励：合约会根据当前合约的余额和总质押代币数量计算每个代币的奖励。每次用户质押或提取奖励时，都会更新奖励计算。
+TokenStaking是一个代币质押合约，支持用户将代币锁定在合约中获取奖励，并可以随时提取已锁定的代币。
 
-提取奖励：用户可以在满足最小质押时间（360天）后提取奖励。提取奖励时，合约会根据用户的质押代币数量和奖励计算，将奖励发送给用户。
+函数说明：
 
-提取本金：用户可以在任何时候提取其质押的本金。提取本金时，用户的质押代币数量将减少，合约中的总质押代币数量也将相应减少。
+stake(uint amount)
+将指定数量的代币锁定在合约中，获得对应的奖励。
 
-白名单管理：合约管理员可以添加或移除白名单用户。只有白名单上的用户才能质押代币和提取本金。
+参数：
 
-管理员管理：合约管理员可以更改管理员地址、向合约中存入奖励和提取奖励。
+amount: 要锁定的代币数量。
 
-查询功能：合约提供了一些查询函数，如查询总质押代币数量、查询用户的质押代币数量和查询用户的奖励金额。
+withdrawReward()
+提取已获得的奖励。
+
+withdrawPrincipal(uint amount)
+提取已锁定的代币。
+
+参数：
+
+amount: 要提取的代币数量。
+
+addToBlacklist(address account)
+将指定用户加入黑名单，阻止其进行质押和提现操作。
+
+参数：
+
+account: 要加入黑名单的用户地址。
+
+removeFromBlacklist(address account)
+将指定用户从黑名单中移除，允许其进行质押和提现操作。
+
+参数：
+
+account: 要移除黑名单的用户地址。
+
+setTokenAddress(address newTokenAddress)
+设置质押的代币地址。
+
+参数：
+
+newTokenAddress: 新的代币地址。
+
+setMaxStakingAmount(uint newMaxStakingAmount)
+设置最大质押限制。
+
+参数：
+
+newMaxStakingAmount: 新的最大质押限制。
+
+pause()
+暂停合约操作，阻止质押和提现操作。
+
+unpause()
+恢复合约操作，允许质押和提现操作。
+
+depositRewards()
+向合约中存入奖励。
+
+withdrawRewards()
+提取合约中的所有奖励。
+
+getTotalStakedTokens()
+获取当前合约中总的锁定代币数量。
+
+getStakedTokens(address account)
+获取指定用户在合约中锁定的代币数量。
+
+参数：
+
+account: 用户地址。
+
+getRewardAmount(address account)
+获取指定用户当前可提取的奖励数量。
+
+参数：
+
+account: 用户地址。

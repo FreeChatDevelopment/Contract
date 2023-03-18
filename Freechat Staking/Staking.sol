@@ -1,85 +1,107 @@
 pragma solidity ^0.8.0;
 
-interface Token {
-    function transfer(address to, uint256 amount) external returns (bool);
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-}
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
-contract TokenStaking {
+contract TokenStaking is Ownable, Pausable {
+    using SafeERC20 for IERC20;
     address public tokenAddress = 0x171b1daefac13a0a3524fcb6beddc7b31e58e079;
+    uint public maxTotalTokenAmount = 1000000 * 10**18; // Maximum staking amount is set to 1,000,000 tokens
     uint public totalTokenAmount;
     uint public rewardPerToken;
     uint public lastTotalRewardAmount;
-    address public adminAddress;
     mapping(address => uint) public balances;
     mapping(address => uint) public lastRewardAmounts;
     mapping(address => uint) public depositTimestamps;
-    mapping(address => bool) public isWhitelisted;
+    mapping(address => bool) public isBlacklisted;
     uint public minStakeTime = 360 days;
 
-    constructor() {
-        adminAddress = msg.sender;
-    }
+    event Staked(address indexed user, uint amount);
+    event WithdrawnReward(address indexed user, uint rewardAmount);
+    event WithdrawnPrincipal(address indexed user, uint amount);
+    event BlacklistUpdated(address indexed account, bool isBlacklisted);
+    event MaxStakingAmountUpdated(uint newMaxStakingAmount);
 
-    function updateRewardPerToken() internal {
+    constructor() Ownable() Pausable() {}
+
+    function updateRewardPerToken() private {
         uint currentTotalRewardAmount = address(this).balance;
         if (currentTotalRewardAmount > lastTotalRewardAmount && totalTokenAmount > 0) {
-            rewardPerToken += (currentTotalRewardAmount - lastTotalRewardAmount) / totalTokenAmount;
+            rewardPerToken = rewardPerToken + ((currentTotalRewardAmount - lastTotalRewardAmount) * 10**IERC20(tokenAddress).decimals()) / totalTokenAmount;
         }
         lastTotalRewardAmount = currentTotalRewardAmount;
     }
 
-    function stake(uint amount) external {
+    function stake(uint amount) external whenNotPaused {
         require(amount > 0, "Amount must be greater than zero.");
-        require(isWhitelisted[msg.sender], "You are not allowed to stake tokens.");
+        require(!isBlacklisted[msg.sender], "You are not allowed to stake tokens.");
+        require(totalTokenAmount + amount <= maxTotalTokenAmount, "Staking amount exceeds maximum limit.");
         updateRewardPerToken();
-        balances[msg.sender] += amount;
+        balances[msg.sender] = balances[msg.sender] + amount;
         lastRewardAmounts[msg.sender] = balances[msg.sender] * rewardPerToken;
         depositTimestamps[msg.sender] = block.timestamp;
-        totalTokenAmount += amount;
-        require(Token(tokenAddress).transferFrom(msg.sender, address(this), amount), "Token transfer failed.");
+        totalTokenAmount = totalTokenAmount + amount;
+        IERC20(tokenAddress).safeTransferFrom(msg.sender, address(this), amount);
+        emit Staked(msg.sender, amount);
     }
 
-    function withdrawReward() external {
+    function withdrawReward() external whenNotPaused {
         require(balances[msg.sender] > 0, "You have not staked any tokens.");
         require(block.timestamp >= depositTimestamps[msg.sender] + minStakeTime, "Rewards can only be withdrawn after the 360-day period has expired.");
         updateRewardPerToken();
-        uint rewardAmount = balances[msg.sender] * (rewardPerToken - lastRewardAmounts[msg.sender] / balances[msg.sender]);
+        uint rewardAmount = balances[msg.sender] * (rewardPerToken - lastRewardAmounts[msg.sender]) / 10**IERC20(tokenAddress).decimals();
         lastRewardAmounts[msg.sender] = 0;
-        require(payable(msg.sender).send(rewardAmount), "Reward transfer failed.");
+        (bool success, ) = payable(msg.sender).call{value: rewardAmount}("");
+        require(success, "Reward transfer failed.");
+        emit WithdrawnReward(msg.sender, rewardAmount);
     }
 
-    function withdrawPrincipal(uint amount) external {
-        require(balances[msg.sender] >= amount, "Insufficient balance.");
-        require(isWhitelisted[msg.sender], "You are not allowed to withdraw tokens.");
-        updateRewardPerToken();
-        balances[msg.sender] -= amount;
-        totalTokenAmount -= amount;
-        require(Token(tokenAddress).transfer(msg.sender, amount), "Token transfer failed.");
-    }
-
-    function addWhitelist(address account) external {
-        require(msg.sender == adminAddress, "Only the admin can add to the whitelist.");
-        isWhitelisted[account] = true;
-    }
-
-    function removeWhitelist(address account) external {
-        require(msg.sender == adminAddress, "Only the admin can remove from the whitelist.");
-        isWhitelisted[account] = false;
+function withdrawPrincipal(uint amount) external whenNotPaused {
+    require(balances[msg.sender] >= amount, "Insufficient balance.");
+    require(!isBlacklisted[msg.sender], "You are not allowed to withdraw tokens.");
+    updateRewardPerToken();
+    balances[msg.sender] -= amount;
+    totalTokenAmount -= amount;
+    IERC20(tokenAddress).safeTransfer(msg.sender, amount);
+    emit WithdrawnPrincipal(msg.sender, amount);
 }
 
-function setAdminAddress(address newAdminAddress) external {
-    require(msg.sender == adminAddress, "Only the admin can change the admin address.");
-    adminAddress = newAdminAddress;
+function addToBlacklist(address account) external onlyOwner {
+    isBlacklisted[account] = true;
+    emit BlacklistUpdated(account, true);
 }
 
-function depositRewards() external payable {
-    require(msg.sender == adminAddress, "Only the admin can deposit rewards.");
+function removeFromBlacklist(address account) external onlyOwner {
+    isBlacklisted[account] = false;
+    emit BlacklistUpdated(account, false);
 }
 
-function withdrawRewards() external {
-    require(msg.sender == adminAddress, "Only the admin can withdraw rewards.");
-    require(payable(msg.sender).send(address(this).balance), "Reward transfer failed.");
+function setTokenAddress(address newTokenAddress) external onlyOwner {
+    tokenAddress = newTokenAddress;
+}
+
+function setMaxStakingAmount(uint newMaxStakingAmount) external onlyOwner {
+    maxTotalTokenAmount = newMaxStakingAmount;
+    emit MaxStakingAmountUpdated(newMaxStakingAmount);
+}
+
+function pause() external onlyOwner {
+    _pause();
+}
+
+function unpause() external onlyOwner {
+    _unpause();
+}
+
+function depositRewards() external payable onlyOwner {
+    require(msg.sender == owner(), "Only the owner can deposit rewards.");
+}
+
+function withdrawRewards() external onlyOwner {
+    (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+    require(success, "Reward transfer failed.");
 }
 
 function getTotalStakedTokens() external view returns (uint) {
@@ -97,9 +119,8 @@ function getRewardAmount(address account) external view returns (uint) {
     uint currentRewardPerToken = rewardPerToken;
     uint currentTotalRewardAmount = address(this).balance;
     if (currentTotalRewardAmount > lastTotalRewardAmount && totalTokenAmount > 0) {
-        currentRewardPerToken += (currentTotalRewardAmount - lastTotalRewardAmount) / totalTokenAmount;
+        currentRewardPerToken = currentRewardPerToken + ((currentTotalRewardAmount - lastTotalRewardAmount) * 10**IERC20(tokenAddress).decimals()) / totalTokenAmount;
     }
-    return balances[account] * (currentRewardPerToken - lastRewardAmounts[account] / balances[account]);
+    return balances[account] * (currentRewardPerToken - lastRewardAmounts[account]) / 10**IERC20(tokenAddress).decimals();
 }
-
 
