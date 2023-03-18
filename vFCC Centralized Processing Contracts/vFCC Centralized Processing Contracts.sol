@@ -15,8 +15,8 @@ contract MySecuredContractWithAdminTransferRecord is AccessControl, ReentrancyGu
     using SafeMath for uint256;
     // 使用SafeERC20库来处理IERC20接口的方法调用
     using SafeERC20 for IERC20;
-    // 定义_freechatCoin变量来表示ERC20代币
-    IERC20 private _freechatCoin;
+    // 定义_TokenContractAddress变量来表示ERC20代币
+    IERC20 private _TokenContractAddress;
     // 定义ADMIN_ROLE常量，表示管理员角色
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     // 定义存款记录结构体
@@ -39,9 +39,9 @@ contract MySecuredContractWithAdminTransferRecord is AccessControl, ReentrancyGu
     event Deposit(address indexed user, uint256 amount, uint256 nonce);
     event AdminTransfer(address indexed from, address indexed to, uint256 amount, uint256 nonce);
 
-    // 构造函数，初始化_freechatCoin变量和管理员角色
+    // 构造函数，初始化_TokenContractAddress变量和管理员角色
     constructor(IERC20 freechatCoin) {
-        _freechatCoin = freechatCoin;
+        _TokenContractAddress = freechatCoin;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(ADMIN_ROLE, msg.sender);
     }
@@ -56,7 +56,7 @@ contract MySecuredContractWithAdminTransferRecord is AccessControl, ReentrancyGu
     _recordNonces[msg.sender] = _recordNonces[msg.sender].add(1);
 
     // 调用ERC20代币合约的方法，将代币从用户地址转移到合约地址
-    _freechatCoin.safeTransferFrom(msg.sender, address(this), amount);
+    _TokenContractAddress.safeTransferFrom(msg.sender, address(this), amount);
 }
 
 // 管理员转账函数
@@ -71,10 +71,10 @@ function adminTransfer(address to, uint256 amount) external onlyRole(ADMIN_ROLE)
     _recordNonces[msg.sender] = _recordNonces[msg.sender].add(1);
 
     // 检查合约中的代币余额是否足够
-    require(_freechatCoin.balanceOf(address(this)) >= amount, "合约余额不足");
+    require(_TokenContractAddress.balanceOf(address(this)) >= amount, "合约余额不足");
 
     // 调用ERC20代币合约的方法，将代币从合约地址转移到接收地址
-    _freechatCoin.safeTransfer(to, amount);
+    _TokenContractAddress.safeTransfer(to, amount);
 }
 
 // 根据用户地址和Nonce值获取存款金额
@@ -104,20 +104,20 @@ function getRecipient(address admin, uint256 nonce) public view onlyRole(DEFAULT
 
 // 获取合约中的代币余额
 function getBalance() external view onlyRole(DEFAULT_ADMIN_ROLE) returns (uint256) {
-    return _freechatCoin.balanceOf(address(this));
+    return _TokenContractAddress.balanceOf(address(this));
 }
 
 // 获取合约的授权额度
 function getAllowance() external view onlyRole(DEFAULT_ADMIN_ROLE) returns (uint256) {
-    return _freechatCoin.allowance(msg.sender, address(this));
+    return _TokenContractAddress.allowance(msg.sender, address(this));
 }
 
 // 提现函数，仅限管理员角色调用
 function withdraw(uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant {
     // 检查合约中的代币余额是否足够
-    require(amount <= _freechatCoin.balanceOf(address(this)), "合约余额不足");
+    require(amount <= _TokenContractAddress.balanceOf(address(this)), "合约余额不足");
     // 调用ERC20代币合约的方法，将代币从合约地址转移到调用者地址
-    _freechatCoin.safeTransfer(msg.sender, amount);
+    _TokenContractAddress.safeTransfer(msg.sender, amount);
 }
 
 // 撤销管理员角色
