@@ -1,3 +1,36 @@
+## 这是一个名为 "Freechat vFCC中心化积分系统" 的智能合约，其功能如下：
+
+只有被授予 "ADMIN_ROLE" 的角色才能进行 "adminTransfer" 操作，该操作允许管理员向指定地址转移代币。
+
+"deposit" 函数允许用户将代币存入合约中，存入的代币数量不能为 0。
+
+"withdraw" 函数允许管理员从合约中提取代币，提取的代币数量不能超过合约中存储的余额。
+
+"emergencyWithdraw" 函数允许管理员从合约中提取所有的代币。
+
+"getDepositAmount" 函数允许用户获取指定 nonce 的存款金额。
+
+"getDepositNonce" 函数允许用户获取他们存入合约的存款记录数。
+
+"getAdminTransferAmount" 函数允许管理员获取指定 nonce 的转账金额。
+
+"getAdminTransferNonce" 函数允许管理员获取他们进行的转账记录数。
+
+"getRecipient" 函数允许管理员获取指定 nonce 的转账接收地址。
+
+"getBalance" 函数允许管理员获取合约中存储的代币余额。
+
+"getAllowance" 函数允许管理员获取合约被授权的代币数量。
+
+"revokeAdminRole" 和 "grantAdminRole" 函数允许管理员对其他帐户授予或撤销 "ADMIN_ROLE" 角色。
+
+"renounceAdminRole" 函数允许管理员自己放弃 "ADMIN_ROLE" 角色。
+
+该合约使用了 OpenZeppelin 的 AccessControl 和 ReentrancyGuard 库以增加安全性。
+
+
+## vFCC代码参数的描述
+
 ### 引用的 Solidity 库和协议
 
 @openzeppelin/contracts/token/ERC20/IERC20.sol：用于 ERC20 token 的接口定义
