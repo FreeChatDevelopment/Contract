@@ -12,6 +12,10 @@ FreechatDAO智能合约库，公开代码以及接受安全审计。
 
 FreechatDAO的社区治理代币智能合约，可以应用于Freechat App的应用。
 
+### Freechat Revenue Sharing Contract
+
+FreechatDAO收入进行收入分配的合约
+
 ### vFCC Centralized Processing Contracts
 
 FreechatDAO的vFCC代币处理的智能合约。

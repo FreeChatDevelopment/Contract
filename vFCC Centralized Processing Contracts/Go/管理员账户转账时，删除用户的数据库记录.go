@@ -1,83 +1,69 @@
 package main
 
 import (
-    "context"
+    "database/sql"
     "fmt"
     "math/big"
 
-    "github.com/ethereum/go-ethereum/accounts/abi"
-    "github.com/ethereum/go-ethereum/accounts/abi/bind"
     "github.com/ethereum/go-ethereum/common"
-    "github.com/ethereum/go-ethereum/crypto"
     "github.com/ethereum/go-ethereum/ethclient"
-    "go.mongodb.org/mongo-driver/bson"
-    "go.mongodb.org/mongo-driver/mongo"
-    "go.mongodb.org/mongo-driver/mongo/options"
-    "go.mongodb.org/mongo-driver/mongo/readpref"
-)
-
-import (
-    mycontract "path/to/MySecuredContractWithAdminTransferRecord"
-    token "path/to/ERC20Token"
+    _ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
-    // 连接以太坊客户端
+    // 连接以太坊节点
     client, err := ethclient.Dial("https://mainnet.infura.io/v3/<your-project-id>")
     if err != nil {
-        panic(err)
+        fmt.Println("Failed to connect to the Ethereum network:", err)
+        return
     }
 
-    // 账户私钥和地址
-    privateKey, err := crypto.HexToECDSA("<your-private-key>")
+    // 合约地址和管理员地址
+    contractAddress := common.HexToAddress("<contract-address>")
+    adminAddress := common.HexToAddress("<admin-address>")
+
+    // 获取转账Nonce值
+    var nonce *big.Int
+    if err := client.CallContext(context.Background(), &nonce, "eth_getTransactionCount", adminAddress, "latest"); err != nil {
+        fmt.Println("Failed to get transaction count:", err)
+        return
+    }
+
+    // 从合约中获取转账金额和接收地址
+    var amount *big.Int
+    var recipient common.Address
+    if err := client.CallContext(context.Background(), &amount, "eth_call", map[string]string{
+        "to":   contractAddress.Hex(),
+        "data": fmt.Sprintf("0x7c59db20%064x%064x", recipient, amount),
+    }, "latest"); err != nil {
+        fmt.Println("Failed to get transfer information:", err)
+        return
+    }
+
+    // 更新MySQL数据库中接收地址的余额
+    db, err := sql.Open("mysql", "user:password@tcp(localhost:3306)/mydb")
     if err != nil {
-        panic(err)
+        fmt.Println("Failed to connect to the MySQL database:", err)
+        return
     }
-    publicKey := privateKey.Public()
-    publicKeyECDSA, ok := publicKey.(*crypto.PublicKey)
-    if !ok {
-        panic("error casting public key to ECDSA")
+    defer db.Close()
+
+    var currentBalance *big.Int
+    if err := db.QueryRow("SELECT balance FROM accounts WHERE address = ?", recipient.Hex()).Scan(&currentBalance); err != nil {
+        fmt.Println("Failed to get account balance:", err)
+        return
     }
-    fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
 
-    // 合约地址
-    contractAddress := common.HexToAddress("<your-contract-address>")
-
-    // 获取管理员账户的nonce值
-    nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
+    newBalance := new(big.Int).Add(currentBalance, amount)
+    _, err = db.Exec("UPDATE accounts SET balance = ? WHERE address = ?", newBalance.String(), recipient.Hex())
     if err != nil {
-        panic(err)
+        fmt.Println("Failed to update account balance:", err)
+        return
     }
 
-    // 创建管理员账户的签名私钥
-    auth := bind.NewKeyedTransactor(privateKey)
-    auth.Nonce = big.NewInt(int64(nonce))
-    auth.Value = big.NewInt(0)
-    auth.GasLimit = uint64(300000) // 指定gas上限
-    auth.GasPrice = big.NewInt(1000000000) // 指定gas价格
+    fmt.Printf("Successfully transferred %s tokens to %s\n", amount.String(), recipient.Hex())
+}
 
-    // 创建MySecuredContractWithAdminTransferRecord合约实例
-    instance, err := mycontract.NewMySecuredContractWithAdminTransferRecord(contractAddress, client)
-    if err != nil {
-        panic(err)
-    }
+//在这个示例中，我们连接到以太坊网络和MySQL数据库。然后，我们指定了合约地址和管理员地址，使用以太坊JSON-RPC API获取管理员的转账信息，然后连接到MySQL数据库，并更新接收地址的余额。最后，我们将成功转账的信息打印到控制台。
 
-    // ERC20代币合约地址
-    tokenAddress := common.HexToAddress("<your-token-address>")
-    // 创建代币合约实例
-    tokenInstance, err := token.NewToken(tokenAddress, client)
-    if err != nil {
-        panic(err)
-    }
-
-    // 转账目标地址
-    toAddress := common.HexToAddress("<recipient-address>")
-
-    // 转账金额
-    amount := big.NewInt(1000000000000000000) // 1个代币，单位为Wei
-
-    // 构造调用代币合约转账函数的交易数据
-    tokenAbi, err := abi.JSON(strings.NewReader(token.TokenABI))
-    if err
-
-根据这份合约代码，查询管理员转账记录，可以通过调用 getAdminTransferAmount 和 getAdminTransferNonce 函数来获取管理员的转账金额和操作次数。然后，可以根据用户地址和操作次数在数据库中找到对应的数据并进行修改。假设数据库中的用户数据存储在名为 users 的集合中，下面是修改用户数据的示例代码：
+//请注意，您需要将<your-project-id>替换为您自己的Infura项目ID，并将<contract-address>和<admin-address>替换为您要查询的合约地址和管理员地址。另外，您需要将连接字符串"user:password@tcp(localhost:3306)/mydb"替换为您自己的MySQL数据库连接字符串。还要确保在数据库中创建了名为“accounts”的表，该表包含列"address"和"balance"。

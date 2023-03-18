@@ -1,65 +1,62 @@
 package main
 
 import (
-	"context"
-	"database/sql"
-	"fmt"
-	"log"
+    "context"
+    "database/sql"
+    "fmt"
+    "math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
-	_ "github.com/go-sql-driver/mysql"
-
-	mycontract "path/to/MySecuredContractWithAdminTransferRecord" // 导入Solidity合约生成的Go绑定包
+    "github.com/ethereum/go-ethereum/common"
+    "github.com/ethereum/go-ethereum/ethclient"
+    _ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
-	// 连接以太坊客户端
-	client, err := ethclient.Dial("https://mainnet.infura.io/v3/<your-project-id>")
-	if err != nil {
-		panic(err)
-	}
+    // 连接以太坊节点
+    client, err := ethclient.Dial("https://mainnet.infura.io/v3/<your-project-id>")
+    if err != nil {
+        fmt.Println("Failed to connect to the Ethereum network:", err)
+        return
+    }
 
-	// 数据库连接信息
-	db, err := sql.Open("mysql", "<username>:<password>@tcp(<host>:<port>)/<database-name>")
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
+    // 合约地址和用户地址
+    contractAddress := common.HexToAddress("<contract-address>")
+    userAddress := common.HexToAddress("<user-address>")
 
-	// 合约地址
-	contractAddress := common.HexToAddress("<your-contract-address>")
+    // 获取存款Nonce值
+    var nonce *big.Int
+    if err := client.CallContext(context.Background(), &nonce, "eth_getTransactionCount", userAddress, "latest"); err != nil {
+        fmt.Println("Failed to get transaction count:", err)
+        return
+    }
 
-	// 创建MySecuredContractWithAdminTransferRecord合约实例
-	instance, err := mycontract.NewMySecuredContractWithAdminTransferRecord(contractAddress, client)
-	if err != nil {
-		panic(err)
-	}
+    // 从合约中获取存款金额
+    var depositAmount *big.Int
+    if err := client.CallContext(context.Background(), &depositAmount, "eth_call", map[string]string{
+        "to":   contractAddress.Hex(),
+        "data": fmt.Sprintf("0x3b16c1de%064x%064x", userAddress, nonce),
+    }, "latest"); err != nil {
+        fmt.Println("Failed to get deposit amount:", err)
+        return
+    }
 
-	// 订阅Deposit事件
-	logs := make(chan *mycontract.MySecuredContractWithAdminTransferRecordDeposit)
-	sub, err := instance.WatchDeposit(nil, logs)
-	if err != nil {
-		panic(err)
-	}
-	defer sub.Unsubscribe()
+    // 连接MySQL数据库
+    db, err := sql.Open("mysql", "user:password@tcp(localhost:3306)/mydb")
+    if err != nil {
+        fmt.Println("Failed to connect to the MySQL database:", err)
+        return
+    }
+    defer db.Close()
 
-	// 循环监听事件
-	for {
-		select {
-		case err := <-sub.Err():
-			log.Fatal(err)
-		case event := <-logs:
-			fmt.Printf("Deposit event: user=%s, amount=%s\n", event.User.String(), event.Amount.String())
+    // 插入存款记录
+    _, err = db.Exec("INSERT INTO deposits (user_address, deposit_amount) VALUES (?, ?)", userAddress.Hex(), depositAmount.String())
+    if err != nil {
+        fmt.Println("Failed to insert deposit record:", err)
+        return
+    }
 
-			// 将数据写入数据库
-			_, err := db.Exec("INSERT INTO deposit (user, amount) VALUES (?, ?)", event.User.String(), event.Amount.String())
-			if err != nil {
-				panic(err)
-			}
-		}
-	}
+    fmt.Printf("User %s has deposited %s tokens\n", userAddress.Hex(), depositAmount.String())
 }
 
-
-这份代码订阅了合约的Deposit事件，并在事件触发时将用户地址和存款金额写入了MySQL数据库的deposit表中。你需要替换示例代码中的数据库连接信息和表名，并根据自己的需求进行调整。
+//在这个示例中，我们连接到以太坊网络和MySQL数据库。然后，我们指定了合约地址和用户地址，使用以太坊JSON-RPC API获取用户的存款Nonce值，然后使用合约的ABI编码调用合约函数来获取存款金额。接着，我们连接到MySQL数据库，并将存款记录插入到数据库中。最后，我们将存款金额打印到控制台。
+//请注意，您需要将<your-project-id>替换为您自己的Infura项目ID，并将<contract-address>和<user-address>替换为您要查询的合约地址和用户地址。另外，您需要将连接字符串"user:password@tcp(localhost:3306)/mydb"替换为您自己的MySQL数据库连接字符串。还要确保在数据库中创建了名为“deposits”的表，该表包含列"user_address"和"deposit_amount"。
