@@ -1,69 +1,57 @@
-这个智能合约是一个基于以太坊的智能合约，使用 Solidity 语言编写。该合约可以被用来存储代币，并且记录用户的存款历史记录。
+### 引用的 Solidity 库和协议
 
-### 实现逻辑
-用户存入
+@openzeppelin/contracts/token/ERC20/IERC20.sol：用于 ERC20 token 的接口定义
 
-1.授权合约调用参数。（设置调用数量，授权过期时间）
+@openzeppelin/contracts/access/AccessControl.sol：用于管理合约角色和权限的合约
 
-2.调用合约deposit参数让用户存入FCC。
+@openzeppelin/contracts/utils/math/SafeMath.sol：用于执行安全数学运算的库
 
-3.调用Records参数查询用户存入的记录。
+@openzeppelin/contracts/security/ReentrancyGuard.sol：用于防止重入攻击的合约
 
-4.校验Records的记录与用户在etherscan的记录是否一致。
+### 合约中的主要数据结构和变量
 
-5.中心化系统增加该用户地址的vFCC。
+IERC20 private _freechatCoin：用于管理 ERC20 token 的实例
 
-用户取出
+bytes32 public constant ADMIN_ROLE：用于定义管理员角色的常量
 
-1.通过0x403dD792F7d10e6Ffb7339F383a3Bf862c84c80f地址调用合约Transfer参数并构建用户地址，取款金额。
+struct Record：用于存储存款和管理员转账记录的结构体
 
-2.调用Records的取出记录与用户在etherscan的记录是否一致。
+mapping(address => Record[]) private _records：用于存储用户的存款和管理员转账记录的映射
 
-3.中心化系统扣掉用户的vFCC记录。
+uint256 private constant RECORDS_LIMIT：用于限制存储记录数量的常量
 
-### 该智能合约包含以下函数：
+### 合约中的主要事件
 
-deposit：该函数用于让用户向合约地址存入代币。函数需要两个参数：存款金额和存款 nonce。在调用此函数之前，用户必须先授权代币合约可以转移该用户的代币。调用成功后，存款金额将被记录在用户的存款历史记录中。
+event Deposit：用于记录用户存款的事件
 
-transfer：该函数用于允许管理员向其他地址转移代币。该函数需要三个参数：接收地址、转移金额和转移 nonce。只有管理员才能调用此函数。调用成功后，转移金额将从合约地址转移到接收地址，并且转移金额将被记录在合约地址的转移历史记录中。
+event AdminTransfer：用于记录管理员转账的事件
 
-### 该智能合约还包括以下变量：
+### 合约中的主要函数
 
-freechatCoin：表示该合约将用于存储的代币。
+deposit：用户存款函数，用于将用户的 ERC20 token 存入合约中，并记录存款记录
 
-admin：表示合约的管理员地址。
+adminTransfer：管理员转账函数，用于将 ERC20 token 从合约中转账给指定地址，并记录管理员转账记录
 
-Record：结构体，用于记录用户存款历史记录。其中包含了存款金额、存款 nonce 和转移 nonce。
+getDepositAmount：获取用户指定存款记录的存款金额
 
-records：用于记录用户的存款历史记录。该记录是一个映射表，其中 key 是用户的地址，value 是该用户的存款历史记录。
+getDepositNonce：获取用户存款记录数量
 
-### 该智能合约还增加了以下功能：
+getAdminTransferAmount：获取指定管理员转账记录的转账金额
 
-允许 0x403dD792F7d10e6Ffb7339F383a3Bf862c84c80f 地址调用合约进行转账。
+getAdminTransferNonce：获取管理员转账记录数量
 
-避免了双花攻击，通过记录存款 nonce 和转移 nonce 来保证了转移的安全性。
+getRecipient：获取指定管理员转账记录的接收地址
 
-### 安全措施
-防止双花攻击：
+getBalance：获取合约当前的 ERC20 token 余额
 
-1.确认交易已经被矿工打包确认：可以在发送交易后等待一定数量的区块确认数后再确认交易是否成功，以确保交易已经被确认并且没有被回滚。
+getAllowance：获取合约当前授权可转账的 ERC20 token 数量
 
-2.实现交易序号（nonce）的自增：在每一次交易后，需要将交易序号（nonce）自增，使得每一次交易的nonce都是唯一的，从而防止攻击者进行双花攻击。
+withdraw：管理员提现函数，用于将合约中的 ERC20 token 转账给合约所有者
 
-3.使用最新的Solidity编译器版本：Solidity的更新版本会修复一些已知的漏洞，因此使用最新版本的编译器有助于减少双花攻击的可能性。
+emergencyWithdraw：管理员紧急提现函数，用于将合约中的所有 ERC20 token 转账给合约所有者
 
-4.实现授权过期时间：在进行交易授权时，可以设置授权的过期时间，一旦过期，授权将自动失效，从而防止攻击者使用过期的授权进行双花攻击。
+revokeAdminRole：取消管理员角色的函数，用于从指定账户中撤销管理员角色
 
-对于特定的应用场景，可以考虑使用更为安全的加密算法和数字签名技术来保证交易的安全性。
+grantAdminRole：授予管理员角色的函数，用于将管理员角色授予指定账户
 
-防止重入攻击：在合约中使用Mutex模式，即在函数调用开始时加锁，结束时解锁，确保同一时间只有一个函数可以被执行。
-
-禁止使用tx.origin：在合约中禁止使用tx.origin全局变量，因为tx.origin可以被攻击者伪造，从而伪造用户身份。
-
-增加访问控制：对于只允许管理员调用的函数，应该在函数中加入访问控制，确保只有管理员能够调用。
-
-使用SafeMath库：在合约中进行算术计算时，应该使用SafeMath库，以防止整数溢出和下溢。
-
-限制Gas使用：合约中的函数应该限制Gas的使用，防止攻击者利用恶意代码占用过多的Gas从而耗尽合约的Gas，导致合约无法执行。
-
-加入事件日志：在函数执行结束时，应该通过事件日志记录函数的执行结果和相关信息，方便后续跟踪和审计。
+renounceAdminRole：放弃管理员角色的函数，用于从当前调用者中移除管理员角色
