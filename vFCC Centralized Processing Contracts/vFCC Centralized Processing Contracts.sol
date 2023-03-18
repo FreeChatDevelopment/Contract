@@ -1,4 +1,4 @@
-根据这份合约，写一个GO语言的交互代码。
+根据这份合约，写一个管理员转账的GO语言代码。
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
