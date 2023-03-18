@@ -1,63 +1,88 @@
-// Solidity编译版本
+根据这份合约，写一个GO语言的交互代码。
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// FreechatCoin代币的ERC20合约接口
-interface FreechatCoin {
-    function transfer(address to, uint256 value) external returns (bool);
-    function transferFrom(address from, address to, uint256 value) external returns (bool);
-    function balanceOf(address who) external view returns (uint256);
-    function allowance(address owner, address spender) external view returns (uint256);
-}
+// 导入OpenZeppelin库的IERC20和Ownable接口
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-// MyContract合约
-contract MyContract {
-    // 声明FreechatCoin代币合约实例和管理员地址
-    FreechatCoin public freechatCoin;
-    address public admin;
+// MySecuredContractWithAdminTransferRecord合约，继承自Ownable
+contract MySecuredContractWithAdminTransferRecord is Ownable {
+    // 声明_freechatCoin为IERC20接口类型，存储FreechatCoin代币合约的实例
+    IERC20 private _freechatCoin;
 
-    // 存放用户存款记录的结构体
+    // 存放用户存款记录和管理员转账记录的结构体
     struct Record {
-        uint256 depositAmount;
-        uint256 depositNonce;
-        uint256 transferNonce;
+        uint256 depositAmount; // 用户存款数量
+        uint256 depositNonce; // 用户存款操作计数器
+        uint256 adminTransferAmount; // 管理员转账数量
+        uint256 adminTransferNonce; // 管理员转账操作计数器
     }
 
-    // 存放用户存款记录的映射
-    mapping(address => Record) public records;
+    // 存放用户存款记录和管理员转账记录的映射，键为地址，值为Record结构体实例
+    mapping(address => Record) private _records;
 
-    // 构造函数，初始化合约时传入FreechatCoin代币合约地址
-    constructor(address freechatCoinAddress) {
-        freechatCoin = FreechatCoin(freechatCoinAddress);
-        admin = 0x403dD792F7d10e6Ffb7339F383a3Bf862c84c80f; // 设置管理员地址
+    // 事件：用户存款
+    event Deposit(address indexed user, uint256 amount, uint256 nonce);
+    // 事件：管理员转账
+    event AdminTransfer(address indexed from, address indexed to, uint256 amount, uint256 nonce);
+
+    // 构造函数，初始化合约时传入FreechatCoin代币合约实例
+    constructor(IERC20 freechatCoin) {
+        _freechatCoin = freechatCoin;
     }
 
     // 存款函数，用户通过此函数向合约地址存入代币
-    function deposit(uint256 amount, uint256 nonce) public {
+    function deposit(uint256 amount) external {
         require(amount > 0, "Deposit amount must be greater than 0"); // 检查存款数量是否大于0
-        require(nonce == records[msg.sender].depositNonce + 1, "Invalid nonce"); // 检查nonce是否连续
 
-        // 将用户的代币转入合约地址
-        require(freechatCoin.transferFrom(msg.sender, address(this), amount), "Failed to transfer Freechat Coins");
+        uint256 currentNonce = _records[msg.sender].depositNonce + 1; // 计算当前nonce值
 
         // 更新用户存款记录
-        Record storage record = records[msg.sender];
-        record.depositAmount += amount;
-        record.depositNonce = nonce;
+        _records[msg.sender].depositAmount += amount;
+        _records[msg.sender].depositNonce = currentNonce;
+
+        // 将用户的代币转入合约地址
+        _freechatCoin.transferFrom(msg.sender, address(this), amount);
+
+        // 触发存款事件
+        emit Deposit(msg.sender, amount, currentNonce);
     }
 
-    // 转账函数，仅限管理员调用，用于从合约地址向其他地址转账代币
-    function transfer(address to, uint256 amount, uint256 nonce) public {
-        require(msg.sender == admin, "Only admin can call this function"); // 仅限管理员调用
+    // 管理员转账函数，仅限管理员调用，用于从合约地址向其他地址转账代币
+    function adminTransfer(address to, uint256 amount) external onlyOwner {
         require(amount > 0, "Transfer amount must be greater than 0"); // 检查转账数量是否大于0
-        require(nonce == records[address(this)].transferNonce + 1, "Invalid nonce"); // 检查nonce是否连续
-        require(freechatCoin.allowance(address(this), admin) >= amount, "Contract does not have sufficient allowance"); // 检查合约是否有足够的授权
         require(to != address(0), "Invalid recipient address"); // 检查收款地址是否合法
 
-        // 执行代币转账
-        require(freechatCoin.transfer(to, amount), "Failed to transfer Freechat Coins");
+        uint256 currentNonce = _records[msg.sender].adminTransferNonce + 1; // 计算当前nonce值
 
-        // 更新转账记录
-        Record storage record = records[address(this)];
-        record.transferNonce = nonce;
+        // 更新管理员转账记录
+        _records[msg.sender].adminTransferAmount += amount;
+        _records[msg.sender].adminTransferNonce = currentNonce;
+
+        // 执行代币转账
+        _freechatCoin.transferFrom(msg.sender, to, amount);
+
+        // 触发管理员转账事件
+        emit AdminTransfer(msg.sender, to, amount, currentNonce);
     }
+  
+// 获取用户的存款金额
+function getDepositAmount(address user) external view returns (uint256) {
+return _records[user].depositAmount;
+}
+
+// 获取用户的存款操作次数
+function getDepositNonce(address user) external view returns (uint256) {
+    return _records[user].depositNonce;
+}
+
+// 获取管理员的转账金额
+function getAdminTransferAmount(address admin) external view returns (uint256) {
+    return _records[admin].adminTransferAmount;
+}
+
+// 获取管理员的转账操作次数
+function getAdminTransferNonce(address admin) external view returns (uint256) {
+    return _records[admin].adminTransferNonce;
 }
