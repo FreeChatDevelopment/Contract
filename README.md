@@ -16,6 +16,14 @@ FreechatDAO的社区治理代币智能合约，可以应用于Freechat App的应
 
 FreechatDAO的vFCC代币处理的智能合约。
 
+### FCC质押合约
+
+处理FCC质押奖励的合约。
+
+### NFT盲盒合约
+
+Freechat NFT盲盒合约，用于Freechat发行的NFT。
+
 
 ## 相关资料
 
