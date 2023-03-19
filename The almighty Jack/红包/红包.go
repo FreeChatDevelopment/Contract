@@ -23,29 +23,46 @@ func main() {
 	}
 	defer db.Close()
 
-	// Example: Create a red packet
+	// Example: Create a red packet for user 1
 	redPacket := RedPacket{ID: 1, TotalAmount: 500, Quantity: 10}
-	err = createRedPacket(db, &redPacket)
+	err = createRedPacket(db, &redPacket, 1)
 	if err != nil {
 		fmt.Println("Error creating red packet:", err)
 		return
 	}
 
-	// Example: Grab a red packet for user 1
-	err = grabRedPacket(db, &redPacket, 1)
+	// Example: Grab a red packet for user 2
+	err = grabRedPacket(db, &redPacket, 2)
 	if err != nil {
 		fmt.Println("Error grabbing red packet:", err)
 		return
 	}
 }
 
-func createRedPacket(db *sql.DB, redPacket *RedPacket) error {
+func createRedPacket(db *sql.DB, redPacket *RedPacket, userID int) error {
 	if redPacket.Quantity > maxRedPacketQuantity {
 		return errors.New("red packet quantity exceeds the limit")
 	}
 	if redPacket.TotalAmount <= 0 || redPacket.Quantity <= 0 {
 		return errors.New("total amount and quantity must be greater than 0")
 	}
+
+	// Check if user has enough vFCC balance
+	var balance float64
+	err := db.QueryRow("SELECT balance FROM user_balance WHERE user_id = ?", userID).Scan(&balance)
+	if err != nil {
+		return errors.New("error checking user balance")
+	}
+	if balance < redPacket.TotalAmount {
+		return errors.New("user does not have enough vFCC balance")
+	}
+
+	// Deduct the vFCC balance from the user who creates the red packet
+	_, err = db.Exec("UPDATE user_balance SET balance = balance - ? WHERE user_id = ?", redPacket.TotalAmount, userID)
+	if err != nil {
+		return errors.New("error updating user balance")
+	}
+
 	return nil
 }
 
@@ -75,9 +92,9 @@ func grabRedPacket(db *sql.DB, redPacket *RedPacket, userID int) error {
 	if err != nil {
 		return errors.New("error recording grabbed red packet")
 	}
-
+	
 	redPacket.Quantity--
 	redPacket.TotalAmount -= amountPerPacket
-
+	
 	return nil
-}
+	
