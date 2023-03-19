@@ -20,14 +20,13 @@ FreechatDAO收入进行收入分配的合约
 
 FreechatDAO的vFCC代币处理的智能合约。
 
-### FCC质押合约
+### Freechat Staking
 
 处理FCC质押奖励的合约。
 
-### NFT盲盒合约
+### The almighty Jack
 
-Freechat NFT盲盒合约，用于Freechat发行的NFT。
-
+Jack Long的代码Show
 
 ## 相关资料
 
