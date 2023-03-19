@@ -149,3 +149,34 @@ revokeAdminRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE)：撤销�
 grantAdminRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE)：授予管理员角色。参数为要授予管理员角色的地址。该函数仅限管理员角色调用。该函数将指定地址授予管理员角色。
 
 renounceAdminRole() external：放弃管理员角色。该函数将当前调用者的管理员角色放弃。
+
+
+### 合约介绍
+
+合约功能如下：
+
+存款：用户可以将ERC20代币存入到合约中。
+
+管理员转账：只有管理员角色可以在用户之间进行代币转账。
+
+查询记录：任何人可以查询用户的存款记录和管理员转账记录。
+
+提现：只有管理员角色可以从合约中提取ERC20代币。
+
+管理管理员角色：可以添加、删除或撤销管理员角色。
+
+### 合约测试方法
+
+部署合约：在部署合约时，将ERC20代币合约地址作为构造函数参数传入。
+
+授予和撤销管理员角色：使用grantAdminRole()和revokeAdminRole()函数添加或删除管理员角色。
+
+用户存款：调用deposit()函数，传入要存入的代币数量。
+
+管理员转账：调用adminTransfer()函数，传入接收者地址和要转账的代币数量。
+
+查询记录：使用getDepositAmount()、getDepositNonce()、getAdminTransferAmount()、getAdminTransferNonce()和getRecipient()函数查询存款和转账记录。
+
+提现：调用withdraw()函数，传入要提取的代币数量。
+
+查询余额：使用getBalance()和getAllowance()函数查询合约中的代币余额和授权额度。
