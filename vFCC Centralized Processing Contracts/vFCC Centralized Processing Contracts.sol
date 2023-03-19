@@ -156,13 +156,13 @@ contract MySecuredContractWithAdminTransferRecord is
     }
 
     // 获取合约的授权额度
-    function getAllowance()
+    function getAllowance(address account)
         external
         view
         onlyRole(DEFAULT_ADMIN_ROLE)
         returns (uint256)
     {
-        return _TokenContractAddress.allowance(msg.sender, address(this));
+        return _TokenContractAddress.allowance(account, address(this));
     }
 
     // 提现函数，仅限管理员角色调用
