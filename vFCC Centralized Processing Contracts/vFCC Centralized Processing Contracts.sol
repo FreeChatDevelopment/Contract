@@ -2,11 +2,11 @@
 pragma solidity ^0.8.0;
 
 // 导入依赖库
-import "IERC20.sol";
-import "AccessControl.sol";
-import "SafeMath.sol";
-import "ReentrancyGuard.sol";
-import "SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // 合约：Freechat vFCC中心化积分系统
 // 这个合约继承了AccessControl和ReentrancyGuard。
