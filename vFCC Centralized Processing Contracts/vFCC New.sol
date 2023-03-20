@@ -61,25 +61,16 @@ uint256 private _recordsLimit = 100;
         _setupRole(ADMIN_ROLE, msg.sender);
     }
 
- // 存款函数
+// 存款函数
 function deposit(uint256 amount) external {
     // 检查存款金额是否大于0
     require(amount > 0, "deposit must > 0");
     uint256 currentNonce = _recordNonces[msg.sender];
     require(_records[msg.sender].length < _recordsLimit, "too many records");
-    _records[msg.sender].push(Record(
-        RecordType.Deposit,
-        amount,
-        currentNonce,
-        address(0),
-        block.timestamp
-    ));
-    emit Deposit(msg.sender, amount, currentNonce);
-    _recordNonces[msg.sender] = _recordNonces[msg.sender].add(1);
-        // 判断记录数量是否超过限制
+    // 判断记录数量是否超过限制
     if (_records[msg.sender].length >= _recordsLimit) {
         // 覆盖最旧的记录
-        _records[msg.sender][0] = Record(
+        _records[msg.sender][_recordsLimit - 1] = Record(
             RecordType.Deposit,
             amount,
             currentNonce,
@@ -96,6 +87,8 @@ function deposit(uint256 amount) external {
             block.timestamp
         ));
     }
+    emit Deposit(msg.sender, amount, currentNonce);
+    _recordNonces[msg.sender] = _recordNonces[msg.sender].add(1);
     // 调用ERC20代币合约的方法，将代币从用户地址转移到合约地址
     _TokenContractAddress.safeTransferFrom(
         msg.sender,
@@ -115,19 +108,10 @@ function adminTransfer(
     require(to != address(0), "invalid address");
     uint256 currentNonce = _recordNonces[msg.sender];
     require(_records[msg.sender].length < _recordsLimit, "too many records");
-    _records[msg.sender].push(Record(
-        RecordType.AdminTransfer,
-        amount,
-        currentNonce,
-        to,
-        block.timestamp
-    ));
-    emit AdminTransfer(msg.sender, to, amount, currentNonce);
-    _recordNonces[msg.sender] = _recordNonces[msg.sender].add(1);
     // 判断记录数量是否超过限制
     if (_records[msg.sender].length >= _recordsLimit) {
         // 覆盖最旧的记录
-        _records[msg.sender][0] = Record(
+        _records[msg.sender][_recordsLimit - 1] = Record(
             RecordType.AdminTransfer,
             amount,
             currentNonce,
@@ -144,7 +128,16 @@ function adminTransfer(
             block.timestamp
         ));
     }
-
+    emit AdminTransfer(msg.sender, to, amount, currentNonce);
+    _recordNonces[msg.sender] = _recordNonces[msg.sender].add(1);
+    // 检查合约中的代币余额是否足够
+    require(
+        _TokenContractAddress.balanceOf(address(this)) >= amount,
+        "balance not enough"
+    );
+    // 调用ERC20代币合约的方法，将代币从合约地址转移到接收地址
+    _TokenContractAddress.safeTransfer(to, amount);
+}
     // 检查合约中的代币余额是否足够
     require(
         _TokenContractAddress.balanceOf(address(this)) >= amount,
@@ -180,7 +173,7 @@ if (record.nonce == nonce && record.recordType == recordType) {
 return record;
 }
 }
-revert("record not found");
+rrequire(false, "record not found");
 }
 
  // 获取用户的存款Nonce值
