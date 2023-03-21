@@ -1,126 +1,98 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 
 contract TokenStaking is Ownable, Pausable {
     using SafeERC20 for IERC20;
-    address public tokenAddress = 0x171b1daefac13a0a3524fcb6beddc7b31e58e079;
-    uint public maxTotalTokenAmount = 1000000 * 10**18; // Maximum staking amount is set to 1,000,000 tokens
+    //ERC20token地址
+    address public tokenAddress;
+    //ERC20token精度
+    uint8 private decimals = 18;
+    //Token的最大总发行量
+    uint public maxTotalTokenAmount = 1000000 * 10**decimals; // Maximum staking amount is set to 1,000,000 tokens
+    //Token当前总量
     uint public totalTokenAmount;
-    uint public rewardPerToken;
-    uint public lastTotalRewardAmount;
+    //用户token余额列表
     mapping(address => uint) public balances;
-    mapping(address => uint) public lastRewardAmounts;
-    mapping(address => uint) public depositTimestamps;
+    //黑名单列表
     mapping(address => bool) public isBlacklisted;
-    uint public minStakeTime = 360 days;
 
     event Staked(address indexed user, uint amount);
-    event WithdrawnReward(address indexed user, uint rewardAmount);
     event WithdrawnPrincipal(address indexed user, uint amount);
     event BlacklistUpdated(address indexed account, bool isBlacklisted);
     event MaxStakingAmountUpdated(uint newMaxStakingAmount);
 
-    constructor() Ownable() Pausable() {}
-
-    function updateRewardPerToken() private {
-        uint currentTotalRewardAmount = address(this).balance;
-        if (currentTotalRewardAmount > lastTotalRewardAmount && totalTokenAmount > 0) {
-            rewardPerToken = rewardPerToken + ((currentTotalRewardAmount - lastTotalRewardAmount) * 10**IERC20(tokenAddress).decimals()) / totalTokenAmount;
-        }
-        lastTotalRewardAmount = currentTotalRewardAmount;
+    constructor(address token) Ownable() Pausable() {
+        tokenAddress = token;
     }
-
+   
+    //用户存款
     function stake(uint amount) external whenNotPaused {
+        //判断存储数额是否大于0
         require(amount > 0, "Amount must be greater than zero.");
+        //判断用户是否在黑名单中
         require(!isBlacklisted[msg.sender], "You are not allowed to stake tokens.");
+        //判断合约存款总额是否超过最大额度
         require(totalTokenAmount + amount <= maxTotalTokenAmount, "Staking amount exceeds maximum limit.");
-        updateRewardPerToken();
+        //为用户存入token
         balances[msg.sender] = balances[msg.sender] + amount;
-        lastRewardAmounts[msg.sender] = balances[msg.sender] * rewardPerToken;
-        depositTimestamps[msg.sender] = block.timestamp;
+        //token总存储数额增加
         totalTokenAmount = totalTokenAmount + amount;
+        //用户将token转给合约
         IERC20(tokenAddress).safeTransferFrom(msg.sender, address(this), amount);
         emit Staked(msg.sender, amount);
     }
-
-    function withdrawReward() external whenNotPaused {
-        require(balances[msg.sender] > 0, "You have not staked any tokens.");
-        require(block.timestamp >= depositTimestamps[msg.sender] + minStakeTime, "Rewards can only be withdrawn after the 360-day period has expired.");
-        updateRewardPerToken();
-        uint rewardAmount = balances[msg.sender] * (rewardPerToken - lastRewardAmounts[msg.sender]) / 10**IERC20(tokenAddress).decimals();
-        lastRewardAmounts[msg.sender] = 0;
-        (bool success, ) = payable(msg.sender).call{value: rewardAmount}("");
-        require(success, "Reward transfer failed.");
-        emit WithdrawnReward(msg.sender, rewardAmount);
+        //余额提现，用户地址调用此方法可以提现amount数额的token
+    function withdraw(uint amount) external whenNotPaused {
+        require(balances[msg.sender] >= amount, "Insufficient balance.");
+        require(!isBlacklisted[msg.sender], "You are not allowed to withdraw tokens.");
+        balances[msg.sender] -= amount;
+        totalTokenAmount -= amount;
+        IERC20(tokenAddress).safeTransfer(msg.sender, amount);
+        emit WithdrawnPrincipal(msg.sender, amount);
+    }
+    //将此地址用户添加到黑名单列表中
+    function addToBlacklist(address account) external onlyOwner {
+        isBlacklisted[account] = true;
+        emit BlacklistUpdated(account, true);
+    }
+    //将此地址用户从黑名单列表中移除
+    function removeFromBlacklist(address account) external onlyOwner {
+        isBlacklisted[account] = false;
+        emit BlacklistUpdated(account, false);
+    }
+    //设置token地址
+    function setTokenAddress(address newTokenAddress) external onlyOwner {
+        tokenAddress = newTokenAddress;
+    }
+    //设置最大存入token数量
+    function setMaxStakingAmount(uint newMaxStakingAmount) external onlyOwner {
+        maxTotalTokenAmount = newMaxStakingAmount;
+        emit MaxStakingAmountUpdated(newMaxStakingAmount);
+    }
+    //合约暂停函数，用来发现bug或遭受攻击时暂停合约运行
+    function pause() external onlyOwner {
+        _pause();
+    }
+    //恢复合约运行函数，用来恢复被暂停的合约
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+    function getTotalStakedTokens() external view returns (uint) {
+        //获取当前Token总额
+        return totalTokenAmount;
     }
 
-function withdrawPrincipal(uint amount) external whenNotPaused {
-    require(balances[msg.sender] >= amount, "Insufficient balance.");
-    require(!isBlacklisted[msg.sender], "You are not allowed to withdraw tokens.");
-    updateRewardPerToken();
-    balances[msg.sender] -= amount;
-    totalTokenAmount -= amount;
-    IERC20(tokenAddress).safeTransfer(msg.sender, amount);
-    emit WithdrawnPrincipal(msg.sender, amount);
-}
-
-function addToBlacklist(address account) external onlyOwner {
-    isBlacklisted[account] = true;
-    emit BlacklistUpdated(account, true);
-}
-
-function removeFromBlacklist(address account) external onlyOwner {
-    isBlacklisted[account] = false;
-    emit BlacklistUpdated(account, false);
-}
-
-function setTokenAddress(address newTokenAddress) external onlyOwner {
-    tokenAddress = newTokenAddress;
-}
-
-function setMaxStakingAmount(uint newMaxStakingAmount) external onlyOwner {
-    maxTotalTokenAmount = newMaxStakingAmount;
-    emit MaxStakingAmountUpdated(newMaxStakingAmount);
-}
-
-function pause() external onlyOwner {
-    _pause();
-}
-
-function unpause() external onlyOwner {
-    _unpause();
-}
-
-function depositRewards() external payable onlyOwner {
-    require(msg.sender == owner(), "Only the owner can deposit rewards.");
-}
-
-function withdrawRewards() external onlyOwner {
-    (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
-    require(success, "Reward transfer failed.");
-}
-
-function getTotalStakedTokens() external view returns (uint) {
-    return totalTokenAmount;
-}
-
-function getStakedTokens(address account) external view returns (uint) {
-    return balances[account];
-}
-
-function getRewardAmount(address account) external view returns (uint) {
-    if (balances[account] == 0 || block.timestamp < depositTimestamps[account] + minStakeTime) {
-        return 0;
+    function getStakedTokens(address account) external view returns (uint) {
+        //获取该地址当前staking余额
+        return balances[account];
     }
-    uint currentRewardPerToken = rewardPerToken;
-    uint currentTotalRewardAmount = address(this).balance;
-    if (currentTotalRewardAmount > lastTotalRewardAmount && totalTokenAmount > 0) {
-        currentRewardPerToken = currentRewardPerToken + ((currentTotalRewardAmount - lastTotalRewardAmount) * 10**IERC20(tokenAddress).decimals()) / totalTokenAmount;
-    }
-    return balances[account] * (currentRewardPerToken - lastRewardAmounts[account]) / 10**IERC20(tokenAddress).decimals();
+
+
 }
 
