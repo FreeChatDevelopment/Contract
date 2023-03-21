@@ -12,8 +12,6 @@ const wallet = new ethers.Wallet(walletPrivateKey, provider);
 let extraFeeAmount;
 let gasPrice;
 
-
-
 // 代币合约地址
 const tokenAAddress = '0x...'; // 代币A的合约地址
 const tokenBAddress = '0x...'; // 代币B的合约地址
@@ -145,4 +143,3 @@ executeSwap('1000000000000000000', '1000000000000000000', 50)
   .then(() => console.log('Extra fee sent successfully'))
   .catch(error => console.error('Error:', error));
 
-  
