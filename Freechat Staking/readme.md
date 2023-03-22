@@ -7,17 +7,15 @@ TokenStaking是一个代币质押合约，支持用户将代币锁定在合约�
 函数说明：
 
 stake(uint amount)
-将指定数量的代币锁定在合约中，获得对应的奖励。
+用户将指定数量的代币锁定在合约中。
 
 参数：
 
 amount: 要锁定的代币数量。
 
-withdrawReward()
-提取已获得的奖励。
 
-withdrawPrincipal(uint amount)
-提取已锁定的代币。
+withdraw(uint amount)
+用户提取从合约中提取一定数量被锁定的代币。
 
 参数：
 
@@ -57,12 +55,6 @@ pause()
 unpause()
 恢复合约操作，允许质押和提现操作。
 
-depositRewards()
-向合约中存入奖励。
-
-withdrawRewards()
-提取合约中的所有奖励。
-
 getTotalStakedTokens()
 获取当前合约中总的锁定代币数量。
 
@@ -70,12 +62,6 @@ getStakedTokens(address account)
 获取指定用户在合约中锁定的代币数量。
 
 参数：
-
 account: 用户地址。
 
-getRewardAmount(address account)
-获取指定用户当前可提取的奖励数量。
 
-参数：
-
-account: 用户地址。
